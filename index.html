@@ -392,7 +392,7 @@ tr:hover td{background:#eef3fc}
 
 <script>
 /* ─── BACKEND CONFIGURATION ─── */
-const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyH0YktftWXqg9Tiblvk8y4Kk6UKtlPCF3JCckWarJEZhHrUvND3dYE0yiX_Xs_AnD0/exec";
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbwUSb-6pUEQxJjjiV7x49iy4QLRBqHJkkOnskAbnSZKBjwRB4DX-sjQdPP7N1jM606x/exec";
 const BACKEND_DEPLOYMENT_ID = "AKfycbyH0YktftWXqg9Tiblvk8y4Kk6UKtlPCF3JCckWarJEZhHrUvND3dYE0yiX_Xs_AnD0";
 const STUDY_NAME = "RegioMart Decision-Making Experiment";
 const PROTOTYPE_VERSION = "backend-connected-v1.0";
@@ -468,12 +468,44 @@ const tasks=[
   {id:"q5",title:"Task 5 — Recommendation",question:"Based on full-year gross margin, which product category should management deprioritize?",options:categories}
 ];
 
+/* ─── ENVIRONMENT CAPTURE (for screen-size control variable) ─── */
+function captureEnvironment(){
+  const w = window.innerWidth || document.documentElement.clientWidth || 0;
+  const h = window.innerHeight || document.documentElement.clientHeight || 0;
+  // Inferred device class from viewport width (used as a control)
+  let deviceType = "desktop";
+  if (w > 0 && w < 600) deviceType = "mobile";
+  else if (w >= 600 && w < 1024) deviceType = "tablet";
+  let orientation = "unknown";
+  try {
+    if (screen.orientation && screen.orientation.type) orientation = screen.orientation.type;
+    else orientation = (w >= h) ? "landscape" : "portrait";
+  } catch(e){ orientation = (w >= h) ? "landscape" : "portrait"; }
+  const touch = (("ontouchstart" in window) || (navigator.maxTouchPoints > 0)) ? 1 : 0;
+  return {
+    screen_width: (screen && screen.width) || 0,
+    screen_height: (screen && screen.height) || 0,
+    viewport_width: w,
+    viewport_height: h,
+    device_pixel_ratio: window.devicePixelRatio || 1,
+    color_depth: (screen && screen.colorDepth) || 0,
+    device_type: deviceType,
+    orientation: orientation,
+    touch_support: touch,
+    platform: (navigator.platform || ""),
+    language: (navigator.language || ""),
+    user_agent: (navigator.userAgent || "")
+  };
+}
+
 /* ─── STATE ─── */
 const state={
   page:"welcome",condition:null,
   participant:createParticipantId(),
   controls:{},answers:{},times:{},cognitive:{},manipulation:{},
-  feedback:"",taskOrder:shuffle([...tasks]),taskIndex:0,pageStart:null
+  feedback:"",taskOrder:shuffle([...tasks]),taskIndex:0,pageStart:null,
+  environment: captureEnvironment(),       // captured at session start
+  environment_end: null                    // re-captured at submit (in case of resize/rotate)
 };
 
 /* ─── UTILS ─── */
@@ -1207,6 +1239,7 @@ function makeResult(){
   for(const t of tasks){correct[t.id]=state.answers[t.id]===answerKey[t.id]?1:0;score+=correct[t.id];}
 
   const totalTime = tasks.reduce((sum,t)=>sum+(Number(state.times[t.id])||0),0);
+  const env = (typeof captureEnvironment==='function') ? captureEnvironment() : {};
 
   return{
     study_name:STUDY_NAME,
@@ -1261,6 +1294,21 @@ function makeResult(){
     used_condition:state.manipulation.seen||'',
     perceived_interactivity:state.manipulation.interactivity||'',
     perceived_clarity:state.manipulation.clarity||'',  // FIX: was hardcoded ''
+
+    // ── Device / screen controls (added per midterm feedback) ──
+    screen_width:env.screen_width||'',
+    screen_height:env.screen_height||'',
+    viewport_width:env.viewport_width||'',
+    viewport_height:env.viewport_height||'',
+    device_pixel_ratio:env.device_pixel_ratio||'',
+    color_depth:env.color_depth||'',
+    device_type:env.device_type||'',
+    orientation:env.orientation||'',
+    touch_support:(env.touch_support!==undefined?env.touch_support:''),
+    platform:env.platform||'',
+    language:env.language||'',
+    user_agent:(env.user_agent||'').slice(0,250),
+
     feedback:state.feedback||''
   };
 }
